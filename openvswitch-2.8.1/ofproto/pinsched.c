@@ -60,7 +60,7 @@ advance_txq(struct pinsched *ps)
 {
     struct hmap_node *next;
 
-    next = (ps->next_txq
+    next = (ps->next_txq/* 指向下一个队列，公平调度 */
             ? hmap_next(&ps->queues, &ps->next_txq->node)
             : hmap_first(&ps->queues));
     ps->next_txq = next ? CONTAINER_OF(next, struct pinqueue, node) : NULL;
@@ -125,53 +125,56 @@ pinqueue_get(struct pinsched *ps, ofp_port_t port_no)
 }
 
 /* Drop a packet from the longest queue in 'ps'. */
+/* 在ps中从最长的队列中丢弃一个报文 */
 static void
 drop_packet(struct pinsched *ps)
 {
-    struct pinqueue *longest;   /* Queue currently selected as longest. */
-    int n_longest = 0;          /* # of queues of same length as 'longest'. */
-    struct pinqueue *q;
+    struct pinqueue *longest;   /* Queue currently selected as longest. 用于选择一个最长的队列   */
+    int n_longest = 0;          /* # of queues of same length as 'longest'. 相同长度的队列的个数 */
+    struct pinqueue *q;         /*  */
 
-    ps->n_queue_dropped++;
+    ps->n_queue_dropped++;      /* drop统计 */
 
     longest = NULL;
-    HMAP_FOR_EACH (q, node, &ps->queues) {
-        if (!longest || longest->n < q->n) {
+    HMAP_FOR_EACH (q, node, &ps->queues) {/* 遍历hash表 */
+        if (!longest || longest->n < q->n) {/* 新的队列比老的队列长 */
             longest = q;
             n_longest = 1;
-        } else if (longest->n == q->n) {
+        } else if (longest->n == q->n) {/* 相等，则增加统计计数 */
             n_longest++;
 
             /* Randomly select one of the longest queues, with a uniform
              * distribution (Knuth algorithm 3.4.2R). */
-            if (!random_range(n_longest)) {
+            if (!random_range(n_longest)) {/* 随机选择一个最长队列 */
                 longest = q;
             }
         }
     }
 
     /* FIXME: do we want to pop the tail instead? */
+	/* 是否需要从队列的尾部进行弹出操作 */
     ofpbuf_delete(dequeue_packet(ps, longest));
-    if (longest->n == 0) {
+    if (longest->n == 0) {/* 如果队列中报文个数为0，则销毁队列 */
         pinqueue_destroy(ps, longest);
     }
 }
 
 /* Remove and return the next packet to transmit (in round-robin order). */
+/* 使用rii算法从队列中取出一个报文，然后发送 */
 static struct ofpbuf *
 get_tx_packet(struct pinsched *ps)
 {
     struct ofpbuf *packet;
     struct pinqueue *q;
 
-    if (!ps->next_txq) {
+    if (!ps->next_txq) {/* 如果下一个队列为空，则获取第一个队列 */
         advance_txq(ps);
     }
 
-    q = ps->next_txq;
-    packet = dequeue_packet(ps, q);
-    advance_txq(ps);
-    if (q->n == 0) {
+    q = ps->next_txq;/* 指向当前队列 */
+    packet = dequeue_packet(ps, q);/* 取出一个报文 */
+    advance_txq(ps);/* 调度到下一个队列，公平调度 */
+    if (q->n == 0) {/* 队列为空，销毁 */
         pinqueue_destroy(ps, q);
     }
 
@@ -180,39 +183,42 @@ get_tx_packet(struct pinsched *ps)
 
 /* Attempts to remove enough tokens from 'ps' to transmit a packet.  Returns
  * true if successful, false otherwise.  (In the latter case no tokens are
- * removed.) */
+ * removed.) 
+ * 移除足够的令牌从ps中，然后发送一个报文，当没有足够的令牌的时候，会返回false */
 static bool
 get_token(struct pinsched *ps)
 {
     return token_bucket_withdraw(&ps->token_bucket, 1000);
 }
 
+/* 发送报文 */
 void
-pinsched_send(struct pinsched *ps, ofp_port_t port_no,
+pinsched_send(struct pinsched *ps, ofp_port_t port_no,/* 端口 */
               struct ofpbuf *packet, struct ovs_list *txq)
 {
-    ovs_list_init(txq);
-    if (!ps) {
-        ovs_list_push_back(txq, &packet->list_node);
-    } else if (!ps->n_queued && get_token(ps)) {
+    ovs_list_init(txq);/* 初始化发送队列 */
+    if (!ps) {/* 如果队列为空 */
+        ovs_list_push_back(txq, &packet->list_node);/* 将报文链接到发送链表 */
+    } else if (!ps->n_queued && get_token(ps)) {/* 如果队列数为 */
         /* In the common case where we are not constrained by the rate limit,
          * let the packet take the normal path. */
         ps->n_normal++;
-        ovs_list_push_back(txq, &packet->list_node);
+        ovs_list_push_back(txq, &packet->list_node);/* 将报文链接到发送队列 */
     } else {
         /* Otherwise queue it up for the periodic callback to drain out. */
-        if (ps->n_queued * 1000 >= ps->token_bucket.burst) {
-            drop_packet(ps);
+        if (ps->n_queued * 1000 >= ps->token_bucket.burst) {/*  */
+            drop_packet(ps);/* 队列满了，删掉一个报文 */
         }
 
-        struct pinqueue *q = pinqueue_get(ps, port_no);
-        ovs_list_push_back(&q->packets, &packet->list_node);
+        struct pinqueue *q = pinqueue_get(ps, port_no);/* 获取端口对应的队列 */
+        ovs_list_push_back(&q->packets, &packet->list_node);/* 放入到队列底部 */
         q->n++;
         ps->n_queued++;
         ps->n_limited++;
     }
 }
 
+/* 周期运行队列，获取需要发送的报文到发送队列 */
 void
 pinsched_run(struct pinsched *ps, struct ovs_list *txq)
 {

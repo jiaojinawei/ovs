@@ -107,7 +107,7 @@
  * rules.  With two hash tables, you look up a given flow in each hash table.
  * If there are no matches, the classifier didn't contain a match; if you find
  * a match in one of them, that's the result; if you find a match in both of
- * them, then the result is the rule with the higher priority.
+ * them, then the result is the rule with the higher priority. 选择最高优先级的
  *
  * This is how the classifier works.  In a "struct classifier", each form of
  * "struct cls_rule" present (based on its ->match.mask) goes into a separate
@@ -311,6 +311,7 @@ extern "C" {
 #endif
 
 /* Classifier internal data structures. */
+/* 分类器内部数据结构，子表 */
 struct cls_subtable;
 struct cls_match;
 

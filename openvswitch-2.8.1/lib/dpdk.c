@@ -412,6 +412,7 @@ dpdk_init__(const struct smap *ovs_other_config)
     }
 
     /* Make sure things are initialized ... */
+	/* 这里确保dpdk的所有初始化完成 */
     result = rte_eal_init(argc, argv);
     if (result < 0) {
         ovs_abort(result, "Cannot init EAL");
@@ -452,6 +453,7 @@ dpdk_init__(const struct smap *ovs_other_config)
     netdev_dpdk_register();
 }
 
+/* dpdk库使用前初始化 */
 void
 dpdk_init(const struct smap *ovs_other_config)
 {
@@ -464,7 +466,7 @@ dpdk_init(const struct smap *ovs_other_config)
     if (smap_get_bool(ovs_other_config, "dpdk-init", false)) {
         static struct ovsthread_once once_enable = OVSTHREAD_ONCE_INITIALIZER;
 
-        if (ovsthread_once_start(&once_enable)) {
+        if (ovsthread_once_start(&once_enable)) {/* 只初始化一次 */
             VLOG_INFO("DPDK Enabled - initializing...");
             dpdk_init__(ovs_other_config);
             enabled = true;

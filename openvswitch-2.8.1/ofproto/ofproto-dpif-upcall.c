@@ -1228,6 +1228,7 @@ should_install_flow(struct udpif *udpif, struct upcall *upcall)
     return true;
 }
 
+/* upcall回调函数 */
 static int
 upcall_cb(const struct dp_packet *packet, const struct flow *flow, ovs_u128 *ufid,
           unsigned pmd_id, enum dpif_upcall_type type,

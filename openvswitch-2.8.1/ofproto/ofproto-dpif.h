@@ -249,7 +249,7 @@ extern struct shash all_dpif_backers;
 struct ofport_dpif *odp_port_to_ofport(const struct dpif_backer *, odp_port_t);
 
 /* A bridge based on a "dpif" datapath. */
-
+/* dpif网桥描述控制块 */
 struct ofproto_dpif {
     struct hmap_node all_ofproto_dpifs_node; /* In 'all_ofproto_dpifs'. */
     struct ofproto up;
@@ -277,9 +277,9 @@ struct ofproto_dpif {
     struct mcast_snooping *ms;
     bool has_bonded_bundles;
     bool lacp_enabled;
-    struct mbridge *mbridge;
+    struct mbridge *mbridge;/* 网桥镜像配置入口 */
 
-    struct ovs_mutex stats_mutex;
+    struct ovs_mutex stats_mutex;/* 统计互斥锁 */
     struct netdev_stats stats OVS_GUARDED; /* To account packets generated and
                                             * consumed in userspace. */
 

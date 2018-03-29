@@ -63,19 +63,19 @@ struct xlate_out {
 };
 
 struct xlate_in {
-    struct ofproto_dpif *ofproto;
-    ovs_version_t        tables_version;   /* Lookup in this version. */
+    struct ofproto_dpif *ofproto;/* 指向openflow层的交换机接口 */
+    ovs_version_t        tables_version;   /* Lookup in this version. ovs版本号 */
 
     /* Flow to which the OpenFlow actions apply.  xlate_actions() will modify
-     * this flow when actions change header fields. */
+     * this flow when actions change header fields. 指向需要转换的流，xlate会对其进行修改*/
     struct flow flow;
 
     /* Pointer to the original flow received during the upcall. xlate_actions()
-     * will never modify this flow. */
+     * will never modify this flow. 指向原始的flow，不允许修改 */
     const struct flow *upcall_flow;
 
     /* The packet corresponding to 'flow', or a null pointer if we are
-     * revalidating without a packet to refer to. */
+     * revalidating without a packet to refer to. 该流需要处理的报文 */
     const struct dp_packet *packet;
 
     /* Should OFPP_NORMAL update the MAC learning table?  Should "learn"
@@ -90,9 +90,10 @@ struct xlate_in {
 
     /* The rule initiating translation or NULL. If both 'rule' and 'ofpacts'
      * are NULL, xlate_actions() will do the initial rule lookup itself. */
-    struct rule_dpif *rule;
+    struct rule_dpif *rule;/* 需要转换的规则，可以为空 */
 
     /* The actions to translate.  If 'rule' is not NULL, these may be NULL. */
+	/*  需要转换的动作*/
     const struct ofpact *ofpacts;
     size_t ofpacts_len;
 

@@ -134,10 +134,11 @@ frozen_metadata_to_flow(const struct frozen_metadata *md,
  * resumes.  */
 struct frozen_state {
     /* Initial table for processing when thawing. */
+	/* 记录表格id，将来解冻时使用 */
     uint8_t table_id;
 
     /* Pipeline context for processing when thawing. */
-    struct uuid ofproto_uuid;     /* Bridge to resume from. */
+    struct uuid ofproto_uuid;     /* Bridge to resume from. 冰冻时网桥的uuid*/
     struct frozen_metadata metadata; /* Flow metadata. */
     uint8_t *stack;               /* Stack if any. */
     size_t stack_size;

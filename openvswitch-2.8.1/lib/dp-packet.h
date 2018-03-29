@@ -688,11 +688,11 @@ reset_dp_packet_checksum_ol_flags(struct dp_packet *p)
 #endif
 
 enum { NETDEV_MAX_BURST = 32 }; /* Maximum number packets in a batch. */
-
+/* 批量报文描述控制 */
 struct dp_packet_batch {
-    size_t count;
-    bool trunc; /* true if the batch needs truncate. */
-    struct dp_packet *packets[NETDEV_MAX_BURST];
+    size_t count;/* 报文个数 */
+    bool trunc; /* true if the batch needs truncate. 是否需要截断 */
+    struct dp_packet *packets[NETDEV_MAX_BURST];/* 报文描述指针数组，一次只能接收32个报文 */
 };
 
 static inline void

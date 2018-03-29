@@ -61,19 +61,19 @@ token_bucket_set(struct token_bucket *tb,
 bool
 token_bucket_withdraw(struct token_bucket *tb, unsigned int n)
 {
-    if (tb->tokens < n) {
-        long long int now = time_msec();
-        if (now > tb->last_fill) {
-            unsigned long long int elapsed_ull
+    if (tb->tokens < n) {/* 令牌数不够，增加令牌 */
+        long long int now = time_msec();/* 获取当前时间 */
+        if (now > tb->last_fill) {/* 大于上次时间，则可以添加令牌 */
+            unsigned long long int elapsed_ull/* 计算差值 */
                 = (unsigned long long int) now - tb->last_fill;
             unsigned int elapsed = MIN(UINT_MAX, elapsed_ull);
-            unsigned int add = sat_mul(tb->rate, elapsed);
-            unsigned int tokens = sat_add(tb->tokens, add);
-            tb->tokens = MIN(tokens, tb->burst);
-            tb->last_fill = now;
+            unsigned int add = sat_mul(tb->rate, elapsed);/* 根据时间增加令牌 */
+            unsigned int tokens = sat_add(tb->tokens, add);/* 增加令牌 */
+            tb->tokens = MIN(tokens, tb->burst);/* 选择小值 */
+            tb->last_fill = now;/* 更新时间 */
         }
 
-        if (tb->tokens < n) {
+        if (tb->tokens < n) {/* 还小，则返回false   */
             return false;
         }
     }

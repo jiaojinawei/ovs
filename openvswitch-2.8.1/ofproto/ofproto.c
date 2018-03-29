@@ -1362,7 +1362,10 @@ ofproto_bundle_unregister(struct ofproto *ofproto, void *aux)
 
 /* Registers a mirror associated with client data pointer 'aux' in 'ofproto'.
  * If 'aux' is already registered then this function updates its configuration
- * to 's'.  Otherwise, this function registers a new mirror. */
+ * to 's'.  Otherwise, this function registers a new mirror. 
+ * 使用该接口注册一个新的镜像策略，使用ofproto_class统一不同的网桥的镜像实现，
+ * 屏蔽底层网桥的实现，目前来看只有一种
+ */
 int
 ofproto_mirror_register(struct ofproto *ofproto, void *aux,
                         const struct ofproto_mirror_settings *s)
@@ -1373,7 +1376,9 @@ ofproto_mirror_register(struct ofproto *ofproto, void *aux,
 }
 
 /* Unregisters the mirror registered on 'ofproto' with auxiliary data 'aux'.
- * If no mirror has been registered, this has no effect. */
+ * If no mirror has been registered, this has no effect. 
+ * 取消一个镜像策略
+ */
 int
 ofproto_mirror_unregister(struct ofproto *ofproto, void *aux)
 {
@@ -1384,6 +1389,7 @@ ofproto_mirror_unregister(struct ofproto *ofproto, void *aux)
  * 'aux' in 'ofproto'.  Stores packet and byte counts in 'packets' and
  * 'bytes', respectively.  If a particular counters is not supported,
  * the appropriate argument is set to UINT64_MAX.
+ * 获取镜像策略的统计信息
  */
 int
 ofproto_mirror_get_stats(struct ofproto *ofproto, void *aux,
@@ -2100,7 +2106,7 @@ ofproto_port_set_config(struct ofproto *ofproto, ofp_port_t ofp_port,
     }
 }
 
-
+/* flow修改初始化 */
 static void
 flow_mod_init(struct ofputil_flow_mod *fm,
               const struct match *match, int priority,
@@ -2108,18 +2114,19 @@ flow_mod_init(struct ofputil_flow_mod *fm,
               enum ofp_flow_mod_command command)
 {
     *fm = (struct ofputil_flow_mod) {
-        .match = *match,
-        .priority = priority,
-        .table_id = 0,
-        .command = command,
-        .buffer_id = UINT32_MAX,
-        .out_port = OFPP_ANY,
-        .out_group = OFPG_ANY,
-        .ofpacts = CONST_CAST(struct ofpact *, ofpacts),
-        .ofpacts_len = ofpacts_len,
+        .match = *match,/* 规则的匹配域 */
+        .priority = priority,/* 规则的优先级 */
+        .table_id = 0,/* 默认加入0表格 */
+        .command = command,/* flow操作命令 */
+        .buffer_id = UINT32_MAX,/* buffer-id无穷大*/
+        .out_port = OFPP_ANY,/* 任意 */
+        .out_group = OFPG_ANY,/* 任意 */
+        .ofpacts = CONST_CAST(struct ofpact *, ofpacts),/* 指向我们的内存 */
+        .ofpacts_len = ofpacts_len,/* 动作长度 */
     };
 }
 
+/* 简单流量修改 */
 static int
 simple_flow_mod(struct ofproto *ofproto,
                 const struct match *match, int priority,
@@ -2129,7 +2136,7 @@ simple_flow_mod(struct ofproto *ofproto,
     struct ofputil_flow_mod fm;
 
     flow_mod_init(&fm, match, priority, ofpacts, ofpacts_len, command);
-
+	/* 修改flow */
     return handle_flow_mod__(ofproto, &fm, NULL);
 }
 
@@ -5833,7 +5840,7 @@ handle_flow_mod__(struct ofproto *ofproto, const struct ofputil_flow_mod *fm,
 
     ovs_mutex_lock(&ofproto_mutex);
     ofm.version = ofproto->tables_version + 1;
-    error = ofproto_flow_mod_start(ofproto, &ofm);
+    error = ofproto_flow_mod_start(ofproto, &ofm);/* 准备修改 */
     if (!error) {
         ofproto_bump_tables_version(ofproto);
         ofproto_flow_mod_finish(ofproto, &ofm, req);

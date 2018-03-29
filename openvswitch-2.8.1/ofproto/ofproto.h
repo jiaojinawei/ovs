@@ -422,24 +422,34 @@ int ofproto_bundle_register(struct ofproto *, void *aux,
 int ofproto_bundle_unregister(struct ofproto *, void *aux);
 
 /* Configuration of mirrors. */
+/* 镜像配置描述控制块 */
 struct ofproto_mirror_settings {
     /* Name for log messages. */
+	/* 镜像名字，用来打印log的 */
     char *name;
 
     /* Bundles that select packets for mirroring upon ingress.  */
+	/* 接收镜像端口 */
     void **srcs;                /* A set of registered ofbundle handles. */
+	/* 接收镜像端口个数 */
     size_t n_srcs;
 
     /* Bundles that select packets for mirroring upon egress.  */
+	/* 发送镜像端口 */
     void **dsts;                /* A set of registered ofbundle handles. */
+	/* 发送镜像端口个数 */
     size_t n_dsts;
 
     /* VLANs of packets to select for mirroring. */
+	/* 哪些VLAN需要被镜像 */
     unsigned long *src_vlans;   /* vlan_bitmap, NULL selects all VLANs. */
 
     /* Output (mutually exclusive). */
+	/* 镜像目的接口 */
     void *out_bundle;           /* A registered ofbundle handle or NULL. */
+	/* 镜像目的VLAN */
     uint16_t out_vlan;          /* Output VLAN, only if out_bundle is NULL. */
+	/* 最大需要镜像的报文长度，如果为0表示最大65535 */
     uint16_t snaplen;           /* Max packet size of a mirrored packet
                                    in byte, set to 0 equals 65535. */
 };

@@ -24,14 +24,15 @@
 extern "C" {
 #endif
 
+/* 令牌桶 */
 struct token_bucket {
     /* Configuration settings. */
-    unsigned int rate;          /* Tokens added per millisecond. */
-    unsigned int burst;         /* Max cumulative tokens credit. */
+    unsigned int rate;          /* Tokens added per millisecond. 每ms的速率 */
+    unsigned int burst;         /* Max cumulative tokens credit. 最大的保证速率*/
 
     /* Current status. */
-    unsigned int tokens;        /* Current number of tokens. */
-    long long int last_fill;    /* Last time tokens added. */
+    unsigned int tokens;        /* Current number of tokens. 当前的令牌数*/
+    long long int last_fill;    /* Last time tokens added. 上次增加令牌的时间*/
 };
 
 #define TOKEN_BUCKET_INIT(RATE, BURST) { RATE, BURST, 0, LLONG_MIN }

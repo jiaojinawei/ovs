@@ -305,15 +305,15 @@ enum ofputil_flow_mod_flags {
                                           to be modified */
 };
 
-/* Protocol-independent flow_mod.
+/* Protocol-independent flow_mod. 协议无关的flow修改
  *
  * The handling of cookies across multiple versions of OpenFlow is a bit
  * confusing.  See the topics/design doc for the details. */
 struct ofputil_flow_mod {
-    struct ovs_list list_node; /* For queuing flow_mods. */
+    struct ovs_list list_node; /* For queuing flow_mods. 会成为一个队列 */
 
-    struct match match;
-    int priority;
+    struct match match;/* 规则的匹配域 */
+    int priority;/* 规则的优先级 */
 
     /* Cookie matching.  The flow_mod affects only flows that have cookies that
      * bitwise match 'cookie' bits in positions where 'cookie_mask has 1-bits.
@@ -340,17 +340,17 @@ struct ofputil_flow_mod {
     ovs_be64 new_cookie;     /* New cookie to install or UINT64_MAX. */
     bool modify_cookie;      /* Set cookie of existing flow to 'new_cookie'? */
 
-    uint8_t table_id;
-    uint16_t command;
-    uint16_t idle_timeout;
-    uint16_t hard_timeout;
-    uint32_t buffer_id;
-    ofp_port_t out_port;
-    uint32_t out_group;
+    uint8_t table_id;/* 要加入的表格id */
+    uint16_t command;/* 命令，添加，修改，删除等 */
+    uint16_t idle_timeout;/* flow空闲时间 */
+    uint16_t hard_timeout;/* flow修改最大的间隔时间 */
+    uint32_t buffer_id;/* buffer-id，当packet-io时使用 */
+    ofp_port_t out_port;/* 输出端口 */
+    uint32_t out_group;/* 输出组 */
     enum ofputil_flow_mod_flags flags;
     uint16_t importance;     /* Eviction precedence. */
-    struct ofpact *ofpacts;  /* Series of "struct ofpact"s. */
-    size_t ofpacts_len;      /* Length of ofpacts, in bytes. */
+    struct ofpact *ofpacts;  /* Series of "struct ofpact"s. 规则动作 */
+    size_t ofpacts_len;      /* Length of ofpacts, in bytes. 动作长度  */
     uint64_t ofpacts_tlv_bitmap; /* 1-bit for each present TLV in 'ofpacts'. */
 };
 
@@ -445,6 +445,7 @@ struct ofpbuf *ofputil_encode_flow_removed(const struct ofputil_flow_removed *,
                                            enum ofputil_protocol);
 
 /* Abstract packet-in message.
+ * packet-in消息抽象表示结构体
  *
  * This omits the 'total_len' and 'buffer_id' fields, which we handle
  * differently for encoding and decoding.*/
@@ -462,16 +463,18 @@ struct ofputil_packet_in {
     size_t packet_len;          /* Length of 'packet' in bytes. */
 
     /* Input port and other metadata for packet. */
+	/* 报文匹配的元数据，比如输入的端口号以及其他元数据 */
     struct match flow_metadata;
 
     /* Reason that the packet-in is being sent. */
+	/* packet-in消息发送的原因 */
     enum ofp_packet_in_reason reason;    /* One of OFPR_*. */
 
     /* Information about the OpenFlow flow that triggered the packet-in.
      *
      * A packet-in triggered by a flow table miss has no associated flow.  In
      * that case, 'cookie' is UINT64_MAX. */
-    uint8_t table_id;                    /* OpenFlow table ID. */
+    uint8_t table_id;                    /* OpenFlow table ID. 命中的表id */
     ovs_be64 cookie;                     /* Flow's cookie. */
 
     /* Arbitrary user-provided data. */
@@ -506,26 +509,26 @@ bool ofputil_packet_in_reason_from_string(const char *,
 struct ofputil_packet_in_private {
     struct ofputil_packet_in base;
 
-    /* NXCPT_BRIDGE. */
+    /* NXCPT_BRIDGE. 报文所属桥的uuid */
     struct uuid bridge;
 
-    /* NXCPT_STACK. */
+    /* NXCPT_STACK. 栈，进行动作处理的时候，可能会递归处理 */
     uint8_t *stack;
-    size_t stack_size;
+    size_t stack_size;/* 栈大小 */
 
-    /* NXCPT_MIRRORS. */
+    /* NXCPT_MIRRORS. 镜像 */
     uint32_t mirrors;
 
-    /* NXCPT_CONNTRACKED. */
+    /* NXCPT_CONNTRACKED. 是否被跟踪*/
     bool conntracked;
 
-    /* NXCPT_ACTIONS. */
+    /* NXCPT_ACTIONS. 动作 */
     struct ofpact *actions;
-    size_t actions_len;
+    size_t actions_len;/* 动作长度 */
 
-    /* NXCPT_ACTION_SET. */
+    /* NXCPT_ACTION_SET. 动作集合 */
     struct ofpact *action_set;
-    size_t action_set_len;
+    size_t action_set_len;/* 动作结合长度 */
 };
 
 struct ofpbuf *ofputil_encode_packet_in_private(

@@ -548,10 +548,10 @@ struct ofpact_metadata {
 
 /* OFPACT_METER.
  *
- * Used for OFPIT13_METER. */
+ * Used for OFPIT13_METER. 需要转换的度量器*/
 struct ofpact_meter {
-    struct ofpact ofpact;
-    uint32_t meter_id;
+    struct ofpact ofpact;/* 动作 */
+    uint32_t meter_id;/* 度量器id */
     uint32_t provider_meter_id;
 };
 

@@ -1831,7 +1831,7 @@ flow_wc_map(const struct flow *flow, struct flowmap *map)
 }
 
 /* Clear the metadata and register wildcard masks. They are not packet
- * header fields. */
+ * header fields. 清除metadata和register域，因为他们不是报文头部的一部分 */
 void
 flow_wildcards_clear_non_packet_fields(struct flow_wildcards *wc)
 {

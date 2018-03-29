@@ -3343,7 +3343,7 @@ bundle_wait(struct ofbundle *bundle)
 }
 
 /* Mirrors. */
-
+/* dpif层端口镜像设置函数 */
 static int
 mirror_set__(struct ofproto *ofproto_, void *aux,
              const struct ofproto_mirror_settings *s)
@@ -3353,11 +3353,11 @@ mirror_set__(struct ofproto *ofproto_, void *aux,
     int error;
     size_t i;
 
-    if (!s) {
+    if (!s) {/* 配置为空，表示删除镜像策略 */
         mirror_destroy(ofproto->mbridge, aux);
         return 0;
     }
-
+	/* 解析源目的端口 */
     srcs = xmalloc(s->n_srcs * sizeof *srcs);
     dsts = xmalloc(s->n_dsts * sizeof *dsts);
 
@@ -3368,7 +3368,7 @@ mirror_set__(struct ofproto *ofproto_, void *aux,
     for (i = 0; i < s->n_dsts; i++) {
         dsts[i] = bundle_lookup(ofproto, s->dsts[i]);
     }
-
+	/* 调用进行设置镜像 */
     error = mirror_set(ofproto->mbridge, aux, s->name, srcs, s->n_srcs, dsts,
                        s->n_dsts, s->src_vlans,
                        bundle_lookup(ofproto, s->out_bundle),
@@ -4051,6 +4051,7 @@ rule_set_recirc_id(struct rule *rule_, uint32_t id)
     ovs_mutex_unlock(&rule->up.mutex);
 }
 
+/* 获取openflow网桥支持的表的版本号 */
 ovs_version_t
 ofproto_dpif_get_tables_version(struct ofproto_dpif *ofproto)
 {
@@ -4059,7 +4060,7 @@ ofproto_dpif_get_tables_version(struct ofproto_dpif *ofproto)
     /* Use memory_order_acquire to signify that any following memory accesses
      * can not be reordered to happen before this atomic read.  This makes sure
      * all following reads relate to this or a newer version, but never to an
-     * older version. */
+     * older version. 读取版本号 */
     atomic_read_explicit(&ofproto->tables_version, &version,
                          memory_order_acquire);
     return version;

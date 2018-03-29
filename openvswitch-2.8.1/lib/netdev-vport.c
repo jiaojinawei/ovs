@@ -66,17 +66,20 @@ static int get_patch_config(const struct netdev *netdev, struct smap *args);
 static int get_tunnel_config(const struct netdev *, struct smap *args);
 static bool tunnel_check_status_change__(struct netdev_vport *);
 
+/* 虚拟端口类型 */
 struct vport_class {
     const char *dpif_port;
-    struct netdev_class netdev_class;
+    struct netdev_class netdev_class;/* 指向网络设备操作函数集合 */
 };
 
+/* 判断该网络设备操作集合是否为vport，根据构建函数来确定 */
 bool
 netdev_vport_is_vport_class(const struct netdev_class *class)
 {
     return is_vport_class(class);
 }
 
+/* 强制类型转换 */
 static const struct vport_class *
 vport_class_cast(const struct netdev_class *class)
 {
@@ -84,12 +87,14 @@ vport_class_cast(const struct netdev_class *class)
     return CONTAINER_OF(class, struct vport_class, netdev_class);
 }
 
+/* 获取网络设备的隧道配置 */
 static const struct netdev_tunnel_config *
 get_netdev_tunnel_config(const struct netdev *netdev)
 {
     return &netdev_vport_cast(netdev)->tnl_cfg;
 }
 
+/* 判断虚接口是否为一个patch端口 */
 bool
 netdev_vport_is_patch(const struct netdev *netdev)
 {
@@ -98,6 +103,7 @@ netdev_vport_is_patch(const struct netdev *netdev)
     return class->get_config == get_patch_config;
 }
 
+/* 判断虚接口是否根据udp的目的端口进行确定 */
 static bool
 netdev_vport_needs_dst_port(const struct netdev *dev)
 {
@@ -172,7 +178,7 @@ netdev_vport_route_changed(void)
 
     free(vports);
 }
-
+/* 分配一个虚接口 */
 static struct netdev *
 netdev_vport_alloc(void)
 {
@@ -180,6 +186,7 @@ netdev_vport_alloc(void)
     return &netdev->up;
 }
 
+/* 虚接口构建函数 */
 int
 netdev_vport_construct(struct netdev *netdev_)
 {
@@ -200,8 +207,8 @@ netdev_vport_construct(struct netdev *netdev_)
         dev->tnl_cfg.dst_port = htons(STT_DST_PORT);
     }
 
-    dev->tnl_cfg.dont_fragment = true;
-    dev->tnl_cfg.ttl = DEFAULT_TTL;
+    dev->tnl_cfg.dont_fragment = true;/* 不分片 */
+    dev->tnl_cfg.ttl = DEFAULT_TTL;/* 使用默认ttl */
     return 0;
 }
 
@@ -221,6 +228,7 @@ netdev_vport_dealloc(struct netdev *netdev_)
     free(netdev);
 }
 
+/* 设置虚接口的网络地址 */
 static int
 netdev_vport_set_etheraddr(struct netdev *netdev_, const struct eth_addr mac)
 {
@@ -229,11 +237,12 @@ netdev_vport_set_etheraddr(struct netdev *netdev_, const struct eth_addr mac)
     ovs_mutex_lock(&netdev->mutex);
     netdev->etheraddr = mac;
     ovs_mutex_unlock(&netdev->mutex);
-    netdev_change_seq_changed(netdev_);
+    netdev_change_seq_changed(netdev_);/* 序列号发生改变 */
 
     return 0;
 }
 
+/* 获取虚接口的网络地址 */
 static int
 netdev_vport_get_etheraddr(const struct netdev *netdev_, struct eth_addr *mac)
 {
@@ -247,7 +256,8 @@ netdev_vport_get_etheraddr(const struct netdev *netdev_, struct eth_addr *mac)
 }
 
 /* Checks if the tunnel status has changed and returns a boolean.
- * Updates the tunnel status if it has changed. */
+ * Updates the tunnel status if it has changed. 
+ * */
 static bool
 tunnel_check_status_change__(struct netdev_vport *netdev)
     OVS_REQUIRES(netdev->mutex)
@@ -261,11 +271,11 @@ tunnel_check_status_change__(struct netdev_vport *netdev)
     iface[0] = '\0';
     route = &netdev->tnl_cfg.ipv6_dst;
     mark = netdev->tnl_cfg.egress_pkt_mark;
-    if (ovs_router_lookup(mark, route, iface, NULL, &gw)) {
+    if (ovs_router_lookup(mark, route, iface, NULL, &gw)) {/* 根据目的端口进行路由查找 */
         struct netdev *egress_netdev;
 
         if (!netdev_open(iface, NULL, &egress_netdev)) {
-            status = netdev_get_carrier(egress_netdev);
+            status = netdev_get_carrier(egress_netdev);/* 获取端口的物理状态 */
             netdev_close(egress_netdev);
         }
     }
@@ -310,13 +320,14 @@ netdev_vport_update_flags(struct netdev *netdev OVS_UNUSED,
     return 0;
 }
 
+/* 虚接口周期运行函数 */
 static void
 netdev_vport_run(const struct netdev_class *netdev_class OVS_UNUSED)
 {
     uint64_t seq;
 
     route_table_run();
-    seq = route_table_get_change_seq();
+    seq = route_table_get_change_seq();/* 序列号发生改变 */
     if (rt_change_seqno != seq) {
         rt_change_seqno = seq;
         netdev_vport_route_changed();
@@ -636,7 +647,7 @@ out:
 
     return err;
 }
-
+/* 获取隧道配置 */
 static int
 get_tunnel_config(const struct netdev *dev, struct smap *args)
 {
@@ -709,7 +720,7 @@ get_tunnel_config(const struct netdev *dev, struct smap *args)
     }
 
     enum tunnel_layers layers = tunnel_supported_layers(type, &tnl_cfg);
-    if (tnl_cfg.pt_mode != default_pt_mode(layers)) {
+    if (tnl_cfg.pt_mode != default_pt_mode(layers)) {/* 获取隧道是工作在二层还是三层 */
         smap_add(args, "packet_type",
                  tnl_cfg.pt_mode == NETDEV_PT_LEGACY_L2 ? "legacy_l2"
                  : tnl_cfg.pt_mode == NETDEV_PT_LEGACY_L3 ? "legacy_l3"

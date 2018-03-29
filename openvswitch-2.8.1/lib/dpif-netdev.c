@@ -121,10 +121,10 @@ static struct odp_support dp_netdev_support = {
 /* Stores a miniflow with inline values */
 
 struct netdev_flow_key {
-    uint32_t hash;       /* Hash function differs for different users. */
-    uint32_t len;        /* Length of the following miniflow (incl. map). */
-    struct miniflow mf;
-    uint64_t buf[FLOW_MAX_PACKET_U64S];
+    uint32_t hash;       /* Hash function differs for different users. hash值，用于区分不同的使用者 */
+    uint32_t len;        /* Length of the following miniflow (incl. map). miniflow的长度 */
+    struct miniflow mf;  /* mini流关键字 */
+    uint64_t buf[FLOW_MAX_PACKET_U64S];/* 用于保存overlay报文的关键字 */
 };
 
 /* Exact match cache for frequently used flows
@@ -520,20 +520,27 @@ struct tx_port {
  * For packets received on ingress port, a look up is done on corresponding PMD
  * thread's flow cache and in case of a miss, lookup is performed in the
  * corresponding classifier of port.  Packets are executed with the found
+ * PMD: 轮询模型驱动,轮询驱动模型通过轮询方式访问设备，可以提高设备的性能。
+ * 驱动不会等待设备。dpif层需要轮询设备去检查接收buffer中是否有报文可以接收。
+ * DPDK使用轮询模型驱动去访问网卡
  * actions in either case.
  * */
 struct dp_netdev_pmd_thread {
-    struct dp_netdev *dp;
-    struct ovs_refcount ref_cnt;    /* Every reference must be refcount'ed. */
-    struct cmap_node node;          /* In 'dp->poll_threads'. */
+    struct dp_netdev *dp;/* 该线程所要轮询的网络设备 */
+    struct ovs_refcount ref_cnt;    /* Every reference must be refcount'ed. 引用计数*/
+    struct cmap_node node;          /* In 'dp->poll_threads'. 链接到网桥轮询线程队列中*/
 
-    pthread_cond_t cond;            /* For synchronizing pmd thread reload. */
-    struct ovs_mutex cond_mutex;    /* Mutex for condition variable. */
+    pthread_cond_t cond;            /* For synchronizing pmd thread reload. 同步条件变量 */
+    struct ovs_mutex cond_mutex;    /* Mutex for condition variable. 条件变量的互斥变量 */
 
     /* Per thread exact-match cache.  Note, the instance for cpu core
      * NON_PMD_CORE_ID can be accessed by multiple threads, and thusly
      * need to be protected by 'non_pmd_mutex'.  Every other instance
-     * will only be accessed by its own pmd thread. */
+     * will only be accessed by its own pmd thread. 
+     * 每一个线程的精确匹配cache。注意：当cpu core为NON_PMD_CORE_ID时，
+     * 该cache能够被多个线程访问，因此需要被互斥信号量non_pmd_mutex进行保护
+     * 其他实例自己访问自己的pmd线程
+     */
     struct emc_cache flow_cache;
 
     /* Flow-Table and classifiers
@@ -541,16 +548,21 @@ struct dp_netdev_pmd_thread {
      * Writers of 'flow_table' must take the 'flow_mutex'.  Corresponding
      * changes to 'classifiers' must be made while still holding the
      * 'flow_mutex'.
+     * 流表的写者必须获取flow_mutex信号量。同样修改分类器classifiers，也需要获取该
+     * 信号量。
      */
-    struct ovs_mutex flow_mutex;
-    struct cmap flow_table OVS_GUARDED; /* Flow table. */
+    struct ovs_mutex flow_mutex;/* 流表保护信号量 */
+    struct cmap flow_table OVS_GUARDED; /* Flow table. 流表 */
 
     /* One classifier per in_port polled by the pmd */
+	/* 分类器--即规则hash桶 */
     struct cmap classifiers;
     /* Periodically sort subtable vectors according to hit frequencies */
+	/* 周期性的对子表进行排序，通过命中频率进行排序 */
     long long int next_optimization;
 
     /* Statistics. */
+	/* 轮询设备的统计信息 */
     struct dp_netdev_pmd_stats stats;
 
     /* Cycles counters */
@@ -563,9 +575,9 @@ struct dp_netdev_pmd_thread {
     struct seq *reload_seq;
     uint64_t last_reload_seq;
     atomic_bool reload;             /* Do we need to reload ports? */
-    pthread_t thread;
-    unsigned core_id;               /* CPU core id of this pmd thread. */
-    int numa_id;                    /* numa node id of this pmd thread. */
+    pthread_t thread;				/* 线程描述控制块 */
+    unsigned core_id;               /* CPU core id of this pmd thread. 对应的cpu核id*/
+    int numa_id;                    /* numa node id of this pmd thread. 对应的插口id */
     bool isolated;
 
     /* Queue id used by this pmd thread to send packets on all netdevs if
@@ -575,6 +587,7 @@ struct dp_netdev_pmd_thread {
 
     struct ovs_mutex port_mutex;    /* Mutex for 'poll_list' and 'tx_ports'. */
     /* List of rx queues to poll. */
+	/* 需要轮询的接收队列，一个线程可以轮询多个队列，也就是多个网卡设备 */
     struct hmap poll_list OVS_GUARDED;
     /* Map of 'tx_port's used for transmission.  Written by the main thread,
      * read by the pmd thread. */
@@ -601,6 +614,7 @@ struct dp_netdev_pmd_thread {
     uint64_t cycles_zero[PMD_N_CYCLES];
 
     /* Set to true if the pmd thread needs to be reloaded. */
+	/* 配置变更，是否需要进行重新配置 */
     bool need_reload;
 };
 
@@ -1907,6 +1921,7 @@ static bool dp_netdev_flow_ref(struct dp_netdev_flow *flow)
 static inline size_t
 netdev_flow_key_size(size_t flow_u64s)
 {
+	/* 一个bit占用8个字节，加上miniflow的字节数即为总的字节数 */
     return sizeof(struct miniflow) + MINIFLOW_VALUES_SIZE(flow_u64s);
 }
 
@@ -4533,6 +4548,7 @@ dp_netdev_count_packet(struct dp_netdev_pmd_thread *pmd,
     non_atomic_ullong_add(&pmd->stats.n[type], cnt);
 }
 
+/* 网络设备进行upcall处理 */
 static int
 dp_netdev_upcall(struct dp_netdev_pmd_thread *pmd, struct dp_packet *packet_,
                  struct flow *flow, struct flow_wildcards *wc, ovs_u128 *ufid,
@@ -4570,6 +4586,7 @@ dp_netdev_upcall(struct dp_netdev_pmd_thread *pmd, struct dp_packet *packet_,
         ds_destroy(&ds);
     }
 
+	/* 直接回调该网桥设备注册的回调函数进行处理 */
     return dp->upcall_cb(packet_, flow, ufid, pmd->core_id, type, userdata,
                          actions, wc, put_actions, dp->upcall_aux);
 }
@@ -4732,13 +4749,13 @@ emc_processing(struct dp_netdev_pmd_thread *pmd,
 
     return dp_packet_batch_size(packets_);
 }
-
+/* 处理上送报文 */
 static inline void
-handle_packet_upcall(struct dp_netdev_pmd_thread *pmd,
-                     struct dp_packet *packet,
-                     const struct netdev_flow_key *key,
-                     struct ofpbuf *actions, struct ofpbuf *put_actions,
-                     int *lost_cnt, long long now)
+handle_packet_upcall(struct dp_netdev_pmd_thread *pmd,/* 该cpu的轮询线程 */
+                     struct dp_packet *packet,/* 报文 */
+                     const struct netdev_flow_key *key,/* 报文关键字 */
+                     struct ofpbuf *actions, struct ofpbuf *put_actions,/* 需要保存的动作 */
+                     int *lost_cnt, long long now)/* 丢失计数 */
 {
     struct ofpbuf *add_actions;
     struct dp_packet_batch b;
@@ -4746,17 +4763,19 @@ handle_packet_upcall(struct dp_netdev_pmd_thread *pmd,
     ovs_u128 ufid;
     int error;
 
-    match.tun_md.valid = false;
-    miniflow_expand(&key->mf, &match.flow);
+    match.tun_md.valid = false;/* 隧道元数据置为非法 */
+    miniflow_expand(&key->mf, &match.flow);/* 将miniflow展开为flow */
 
-    ofpbuf_clear(actions);
+    ofpbuf_clear(actions);/* 将两个action进行清空 */
     ofpbuf_clear(put_actions);
 
+	/* 对关键字进行hash */
     dpif_flow_hash(pmd->dp->dpif, &match.flow, sizeof match.flow, &ufid);
+	/* 处理报文的upcall，传递的upcall的类型为DPIF_UC_MISS */
     error = dp_netdev_upcall(pmd, packet, &match.flow, &match.wc,
                              &ufid, DPIF_UC_MISS, NULL, actions,
                              put_actions);
-    if (OVS_UNLIKELY(error && error != ENOSPC)) {
+    if (OVS_UNLIKELY(error && error != ENOSPC)) {/* 处理不成功直接删除报文，统计丢失计数 */
         dp_packet_delete(packet);
         (*lost_cnt)++;
         return;
@@ -4776,6 +4795,7 @@ handle_packet_upcall(struct dp_netdev_pmd_thread *pmd,
      * the actions.  Otherwise, if there are any slow path actions,
      * we'll send the packet up twice. */
     dp_packet_batch_init_packet(&b, packet);
+	/* 马上执行报文的动作 */
     dp_netdev_execute_actions(pmd, &b, true, &match.flow,
                               actions->data, actions->size, now);
 
@@ -4791,23 +4811,23 @@ handle_packet_upcall(struct dp_netdev_pmd_thread *pmd,
          * move to a per-core classifier, it would be reasonable. */
         ovs_mutex_lock(&pmd->flow_mutex);
         netdev_flow = dp_netdev_pmd_lookup_flow(pmd, key, NULL);
-        if (OVS_LIKELY(!netdev_flow)) {
+        if (OVS_LIKELY(!netdev_flow)) {/* 将新的流加入流表 */
             netdev_flow = dp_netdev_flow_add(pmd, &match, &ufid,
                                              add_actions->data,
                                              add_actions->size);
         }
         ovs_mutex_unlock(&pmd->flow_mutex);
-        emc_probabilistic_insert(pmd, key, netdev_flow);
+        emc_probabilistic_insert(pmd, key, netdev_flow);/* 插入可能的精确匹配 */
     }
 }
-
+/* 快速路径处理函数 */
 static inline void
-fast_path_processing(struct dp_netdev_pmd_thread *pmd,
+fast_path_processing(struct dp_netdev_pmd_thread *pmd,/* 轮询线程描述控制块 */
                      struct dp_packet_batch *packets_,
-                     struct netdev_flow_key *keys,
+                     struct netdev_flow_key *keys,/* 流关键字 */
                      struct packet_batch_per_flow batches[], size_t *n_batches,
-                     odp_port_t in_port,
-                     long long now)
+                     odp_port_t in_port,/* 输入端口编号 */
+                     long long now)/* 当前时间 */
 {
     int cnt = packets_->count;
 #if !defined(__CHECKER__) && !defined(_WIN32)
@@ -4816,61 +4836,71 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
     /* Sparse or MSVC doesn't like variable length array. */
     enum { PKT_ARRAY_SIZE = NETDEV_MAX_BURST };
 #endif
-    struct dp_packet **packets = packets_->packets;
+    struct dp_packet **packets = packets_->packets;/* 获取报文数组首地址 */
     struct dpcls *cls;
     struct dpcls_rule *rules[PKT_ARRAY_SIZE];
-    struct dp_netdev *dp = pmd->dp;
+    struct dp_netdev *dp = pmd->dp;/* 获取该轮询进程所属的网桥设备 */
     int miss_cnt = 0, lost_cnt = 0;
     int lookup_cnt = 0, add_lookup_cnt;
     bool any_miss;
     size_t i;
 
-    for (i = 0; i < cnt; i++) {
+    for (i = 0; i < cnt; i++) {/* 遍历每一个收到的报文，计算其key值占用内存的大小，这是一个压缩的key */
         /* Key length is needed in all the cases, hash computed on demand. */
+		/* key长度在很多情况下都是需要的，比如计算hash值的时候就会需要 */
         keys[i].len = netdev_flow_key_size(miniflow_n_values(&keys[i].mf));
     }
     /* Get the classifier for the in_port */
+	/* 获取该端口的规则hash桶，所有规则根据端口进行hash插入hash表 */
     cls = dp_netdev_pmd_lookup_dpcls(pmd, in_port);
-    if (OVS_LIKELY(cls)) {
+    if (OVS_LIKELY(cls)) {/* 获取到桶，遍历该桶，进行规则匹配 */
         any_miss = !dpcls_lookup(cls, keys, rules, cnt, &lookup_cnt);
     } else {
-        any_miss = true;
+        any_miss = true;/* 没有获取该端口的规则的话，必然存在miss */
         memset(rules, 0, sizeof(rules));
     }
+	/* 如果存在miss，则需要准备处理upcall，因为dpdk本来就是在用户态，所以是一种伪的upcall
+	 * 处理upcall之前需要获取upcall的读写所，获取成功则进行处理
+	 */
     if (OVS_UNLIKELY(any_miss) && !fat_rwlock_tryrdlock(&dp->upcall_rwlock)) {
-        uint64_t actions_stub[512 / 8], slow_stub[512 / 8];
+        uint64_t actions_stub[512 / 8], slow_stub[512 / 8];/* 准备动作栈，一个报文可能会存在多个动作 */
         struct ofpbuf actions, put_actions;
 
         ofpbuf_use_stub(&actions, actions_stub, sizeof actions_stub);
         ofpbuf_use_stub(&put_actions, slow_stub, sizeof slow_stub);
 
-        for (i = 0; i < cnt; i++) {
+        for (i = 0; i < cnt; i++) {/* 循环处理每一个报文 */
             struct dp_netdev_flow *netdev_flow;
 
-            if (OVS_LIKELY(rules[i])) {
+            if (OVS_LIKELY(rules[i])) {/* 如果该报文在dpcls_lookup中查找到了，则跳过 */
                 continue;
             }
 
             /* It's possible that an earlier slow path execution installed
              * a rule covering this flow.  In this case, it's a lot cheaper
-             * to catch it here than execute a miss. */
+             * to catch it here than execute a miss. 
+             * 这种情况是可能出现的，一个早期的满路径已经执行了一个规则可以匹配这条刘。
+             * 所以在这里继续进行一次规则的查找，比执行一次miss要快
+             */
             netdev_flow = dp_netdev_pmd_lookup_flow(pmd, &keys[i],
                                                     &add_lookup_cnt);
-            if (netdev_flow) {
+            if (netdev_flow) {/* 找到，则处理下一个报文 */
                 lookup_cnt += add_lookup_cnt;
                 rules[i] = &netdev_flow->cr;
                 continue;
             }
-
+			/* 统计miss */
             miss_cnt++;
+			/* 将miss当做upcall进行处理 */			
+			/* 一般一条流的首包会存在miss，处理upcall相当于慢转，为快转进行快转表生成*/
             handle_packet_upcall(pmd, packets[i], &keys[i], &actions,
                                  &put_actions, &lost_cnt, now);
         }
 
-        ofpbuf_uninit(&actions);
+        ofpbuf_uninit(&actions);/* 重新初始化动作栈 */
         ofpbuf_uninit(&put_actions);
         fat_rwlock_unlock(&dp->upcall_rwlock);
-    } else if (OVS_UNLIKELY(any_miss)) {
+    } else if (OVS_UNLIKELY(any_miss)) {/* 如果获取upcall失败的话 ，直接丢弃报文 */
         for (i = 0; i < cnt; i++) {
             if (OVS_UNLIKELY(!rules[i])) {
                 dp_packet_delete(packets[i]);
@@ -4880,7 +4910,7 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
         }
     }
 
-    for (i = 0; i < cnt; i++) {
+    for (i = 0; i < cnt; i++) {/* 遍历每一个报文，处理命中的规则 */
         struct dp_packet *packet = packets[i];
         struct dp_netdev_flow *flow;
 
@@ -4888,13 +4918,13 @@ fast_path_processing(struct dp_netdev_pmd_thread *pmd,
             continue;
         }
 
-        flow = dp_netdev_flow_cast(rules[i]);
+        flow = dp_netdev_flow_cast(rules[i]);/* 获取该规则对应的流 */
 
-        emc_probabilistic_insert(pmd, &keys[i], flow);
-        dp_netdev_queue_batches(packet, flow, &keys[i].mf, batches, n_batches);
+        emc_probabilistic_insert(pmd, &keys[i], flow);/* 添加一个一个新的精确匹配表项 */
+        dp_netdev_queue_batches(packet, flow, &keys[i].mf, batches, n_batches);/* 将报文加入到batch中进行处理 */
     }
 
-    dp_netdev_count_packet(pmd, DP_STAT_MASKED_HIT, cnt - miss_cnt);
+    dp_netdev_count_packet(pmd, DP_STAT_MASKED_HIT, cnt - miss_cnt);/* 进行统计 */
     dp_netdev_count_packet(pmd, DP_STAT_LOOKUP_HIT, lookup_cnt);
     dp_netdev_count_packet(pmd, DP_STAT_MISS, miss_cnt);
     dp_netdev_count_packet(pmd, DP_STAT_LOST, lost_cnt);

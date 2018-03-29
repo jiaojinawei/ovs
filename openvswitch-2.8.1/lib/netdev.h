@@ -98,18 +98,19 @@ enum netdev_pt_mode {
 };
 
 /* Configuration specific to tunnels. */
+/* 虚接口的隧道配置 */
 struct netdev_tunnel_config {
-    bool in_key_present;
-    bool in_key_flow;
-    ovs_be64 in_key;
+    bool in_key_present;/* 是否 */
+    bool in_key_flow;/* 是否通过key索引隧道 */
+    ovs_be64 in_key;/* 隧道的key值 */
 
     bool out_key_present;
     bool out_key_flow;
-    ovs_be64 out_key;
+    ovs_be64 out_key;/* 出key */
 
     ovs_be16 dst_port;
 
-    bool ip_src_flow;
+    bool ip_src_flow;/* 是否根据ip的源目的ip索引隧道 */
     bool ip_dst_flow;
     struct in6_addr ipv6_src;
     struct in6_addr ipv6_dst;

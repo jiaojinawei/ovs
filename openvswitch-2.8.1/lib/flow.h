@@ -448,13 +448,14 @@ flowmap_is_empty(struct flowmap fm)
     return true;
 }
 
+/* 返回flowmap中置位为1的bit个数 */
 static inline unsigned int
 flowmap_n_1bits(struct flowmap fm)
 {
     unsigned int n_1bits = 0;
     size_t unit;
 
-    FLOWMAP_FOR_EACH_UNIT (unit) {
+    FLOWMAP_FOR_EACH_UNIT (unit) {/* 遍历每一个数组元素，计算总的置位为1的bit个数 */
         n_1bits += count_1bits(fm.bits[unit]);
     }
     return n_1bits;

@@ -2954,11 +2954,11 @@ bridge_run(void)
          * contents. */
         return;
     }
-    cfg = ovsrec_open_vswitch_first(idl);
+    cfg = ovsrec_open_vswitch_first(idl);/* 获取配置 */
 
-    if (cfg) {
-        netdev_set_flow_api_enabled(&cfg->other_config);
-        dpdk_init(&cfg->other_config);
+    if (cfg) {/* 查看是否配置了dpdk */
+        netdev_set_flow_api_enabled(&cfg->other_config);/* 设置dpdk */
+        dpdk_init(&cfg->other_config);/* dpdk库使用前初始化 */
     }
 
     /* Initialize the ofproto library.  This only needs to run once, but

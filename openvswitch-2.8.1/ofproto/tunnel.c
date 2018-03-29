@@ -363,7 +363,7 @@ tnl_process_ecn(struct flow *flow)
 void
 tnl_wc_init(struct flow *flow, struct flow_wildcards *wc)
 {
-    if (tnl_port_should_receive(flow)) {
+    if (tnl_port_should_receive(flow)) {/* 判断报文是否为隧道报文，是隧道报文的话，匹配部分域值为ff */
         wc->masks.tunnel.tun_id = OVS_BE64_MAX;
         if (flow->tunnel.ip_dst) {
             wc->masks.tunnel.ip_src = OVS_BE32_MAX;
@@ -378,11 +378,11 @@ tnl_wc_init(struct flow *flow, struct flow_wildcards *wc)
         wc->masks.tunnel.ip_tos = UINT8_MAX;
         wc->masks.tunnel.ip_ttl = 0;
         /* The tp_src and tp_dst members in flow_tnl are set to be always
-         * wildcarded, not to unwildcard them here. */
+         * wildcarded, not to unwildcard them here. ttl和4层端口不需要进行匹配*/
         wc->masks.tunnel.tp_src = 0;
         wc->masks.tunnel.tp_dst = 0;
 
-        if (is_ip_any(flow)
+        if (is_ip_any(flow)/* ip报文的话匹配ecn字段 */
             && IP_ECN_is_ce(flow->tunnel.ip_tos)) {
             wc->masks.nw_tos |= IP_ECN_MASK;
         }

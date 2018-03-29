@@ -31,8 +31,8 @@
 VLOG_DEFINE_THIS_MODULE(collectors);
 
 struct collectors {
-    int *fds;                     /* Sockets. */
-    size_t n_fds;                 /* Number of sockets. */
+    int *fds;                     /* Sockets. 套接字 */
+    size_t n_fds;                 /* Number of sockets. 套接字个数 */
 };
 
 /* Opens the targets specified in 'targets' for sending UDP packets.  This is
@@ -57,9 +57,9 @@ collectors_create(const struct sset *targets, uint16_t default_port,
     int retval = 0;
 
     c = xmalloc(sizeof *c);
-    c->fds = xmalloc(sizeof *c->fds * sset_count(targets));
+    c->fds = xmalloc(sizeof *c->fds * sset_count(targets));/* 分配句柄内存 */
     c->n_fds = 0;
-    SSET_FOR_EACH (name, targets) {
+    SSET_FOR_EACH (name, targets) {/* 遍历目标 */
         int error;
         int fd;
 
